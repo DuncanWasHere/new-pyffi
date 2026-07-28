@@ -79,9 +79,10 @@ class TriangleStrip(object):
 
     def get_unstripped_adjacent_face(self, face, vi):
         """Get adjacent face which is not yet stripped."""
-        for otherface in face.get_adjacent_faces(vi):
-            if otherface.index not in self.stripped_faces:
-                return otherface
+        candidates = [otherface for otherface in face.get_adjacent_faces(vi)
+                      if otherface.index not in self.stripped_faces]
+        # Example priority: choose the face with the closest vertex alignment
+        return min(candidates, key=lambda f: f.get_alignment_score(face, vi), default=None)
 
     def traverse_faces(self, start_vertex, start_face, forward):
         """Builds a strip traveral of faces starting from the
@@ -92,35 +93,22 @@ class TriangleStrip(object):
         pv0 = start_vertex
         pv1 = start_face.get_next_vertex(pv0)
         pv2 = start_face.get_next_vertex(pv1)
-        next_face = self.get_unstripped_adjacent_face(start_face, pv0)
-        while next_face:
+
+        while True:
+            next_face = self.get_unstripped_adjacent_face(start_face, pv0)
+            if not next_face:
+                break
             self.stripped_faces.add(next_face.index)
             count += 1
-            if count & 1:
-                if forward:
-                    pv0 = pv1
-                    pv1 = next_face.get_next_vertex(pv0)
-                    self.vertices.append(pv1)
-                    self.faces.append(next_face)
-                else:
-                    pv0 = pv2
-                    pv2 = next_face.get_next_vertex(pv1)
-                    self.vertices.insert(0, pv2)
-                    self.faces.insert(0, next_face)
-                    self.reversed_ = not self.reversed_
+            if forward:
+                pv0, pv1, pv2 = pv1, pv2, next_face.get_next_vertex(pv1)
+                self.vertices.append(pv2)
+                self.faces.append(next_face)
             else:
-                if forward:
-                    pv0 = pv2
-                    pv2 = next_face.get_next_vertex(pv1)
-                    self.vertices.append(pv2)
-                    self.faces.append(next_face)
-                else:
-                    pv0 = pv1
-                    pv1 = next_face.get_next_vertex(pv0)
-                    self.vertices.insert(0, pv1)
-                    self.faces.insert(0, next_face)
-                    self.reversed_ = not self.reversed_
-            next_face = self.get_unstripped_adjacent_face(next_face, pv0)
+                pv0, pv1, pv2 = pv2, pv1, next_face.get_next_vertex(pv0)
+                self.vertices.insert(0, pv2)
+                self.faces.insert(0, next_face)
+                self.reversed_ = not self.reversed_
         return count
 
     def build(self, start_vertex, start_face):

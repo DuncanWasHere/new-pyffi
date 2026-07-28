@@ -5,7 +5,7 @@ import struct
 import warnings
 
 import generated.formats.nif as NifFormat
-from generated.utils.vertex_cache import get_cache_optimized_triangles, stable_stripify
+from generated.utils.meshopt_stripify import stripify as meshopt_stripify
 # END_GLOBALS
 
 class NiTriBasedGeom:
@@ -272,7 +272,8 @@ class NiTriBasedGeom:
 							verbose=0, stripify=True, stitchstrips=False,
 							padbones=False,
 							triangles=None, trianglepartmap=None,
-							maximize_bone_sharing=False):
+							maximize_bone_sharing=False,
+							part_sort_order=[]):
 		"""Recalculate skin partition data.
 
 		:deprecated: Do not use the verbose argument.
@@ -300,6 +301,10 @@ class NiTriBasedGeom:
 			L{triangles}.
 		:param maximize_bone_sharing: Maximize bone sharing between partitions.
 			This option is useful for Fallout 3.
+		:param part_sort_order: List of body part numbers in the order in which
+			they should appear, e.g. [5, 3, 6]. The first entry is counted. When
+			maximize_bone_sharing is true, sorts the parts within the shared bones,
+			and sorts the shared bone lists based on its first body part.
 		"""
 		logger = logging.getLogger("generated.nif.nitribasedgeom")
 
@@ -423,7 +428,7 @@ class NiTriBasedGeom:
 		logger.info("Creating partitions")
 		parts = []
 		# keep creating partitions as long as there are triangles left
-		while triangles:
+		while len(triangles) > 0:
 			# create a partition
 			part = [set(), [], None] # bones, triangles, partition index
 			usedverts = set()
@@ -540,7 +545,7 @@ class NiTriBasedGeom:
 			skindata.skin_partition = skinpart
 		else:
 		# otherwise, create a new block and link it
-			skinpart = NifFormat.classes.NiSkinPartition()
+			skinpart = NifFormat.classes.NiSkinPartition(skindata.context)
 			skindata.skin_partition = skinpart
 			skininst.skin_partition = skinpart
 
@@ -584,6 +589,59 @@ class NiTriBasedGeom:
 			# store update
 			parts = newparts
 
+		# sort the parts based on the given list
+		if part_sort_order:
+			# build a map of body parts to sorted order
+			body_part_order_map = {}
+			sorted_index = 0
+			for body_part_number in part_sort_order:
+				if body_part_number in body_part_order_map:
+					continue
+				else:
+					body_part_order_map[body_part_number] = sorted_index
+					sorted_index += 1
+			# assign an sorted index to any number that was missed
+			for part in parts:
+				if part[2] in body_part_order_map:
+					continue
+				else:
+					body_part_order_map[part[2]] = sorted_index
+					sorted_index += 1
+			# order by the index associated with the body part
+			if maximize_bone_sharing:
+				# first sort within the bonesets
+				shared_boneset_start = 0
+				shared_boneset_end = 1
+				bone_sharing_lists = []
+				while shared_boneset_end <= len(parts):
+					added = True
+					bones = parts[shared_boneset_start][0]
+					while added and shared_boneset_end < len(parts):
+						added = False
+						if len(bones | parts[shared_boneset_end][0]) == len(bones):
+							shared_boneset_end += 1
+							added = True
+						else:
+							break
+					parts[shared_boneset_start:shared_boneset_end] = sorted(
+								parts[shared_boneset_start:shared_boneset_end],
+								key = lambda part: body_part_order_map[part[2]])
+					bone_sharing_lists.append([list(range(shared_boneset_start,
+								shared_boneset_end)),
+								body_part_order_map[parts[shared_boneset_start][2]]])
+					shared_boneset_start = shared_boneset_end
+					shared_boneset_end = shared_boneset_start + 1
+				# then sort the bonesets based on their first entry's body part
+				bone_sharing_lists = sorted(bone_sharing_lists,
+							key = lambda x: x[1])
+				bone_sharing_lists = [entry[0] for entry in bone_sharing_lists]
+				# flatten the indices into a list of the old indices
+				new_part_indices = [index for sublist in bone_sharing_lists for index in sublist]
+				parts = [parts[i] for i in new_part_indices]
+			else:
+				parts = sorted(parts,
+							key = lambda part: body_part_order_map[part[2]])
+
 		# for Fallout 3, set dismember partition indices
 		if isinstance(skininst, NifFormat.classes.BSDismemberSkinInstance):
 			skininst.num_partitions = len(parts)
@@ -593,12 +651,12 @@ class NiTriBasedGeom:
 				bodypart.body_part = part[2]
 				if (lastpart is None) or (lastpart[0] != part[0]):
 					# start new bone set, if bones are not shared
-					bodypart.part_flag.start_new_boneset = 1
+					bodypart.part_flag.pf_start_net_boneset = 1
 				else:
 					# do not start new bone set
-					bodypart.part_flag.start_new_boneset = 0
+					bodypart.part_flag.pf_start_net_boneset = 0
 				# caps are invisible
-				bodypart.part_flag.editor_visible = (part[2] < 100
+				bodypart.part_flag.pf_editor_visible = (part[2] < 100
 													 or part[2] >= 1000)
 				# store part for next iteration
 				lastpart = part
@@ -608,12 +666,9 @@ class NiTriBasedGeom:
 			bones = sorted(list(part[0]))
 			triangles = part[1]
 			logger.info("Optimizing triangle ordering in partition %i"
-						% parts.index(part))
+						% [i for i, check_part in enumerate(parts) if id(check_part) == id(part)][0])
 			# optimize triangles for vertex cache and calculate strips
-			triangles = get_cache_optimized_triangles(
-				triangles)
-			strips = stable_stripify(
-				triangles, stitchstrips=stitchstrips)
+			strips = meshopt_stripify(triangles, 0)
 			triangles_size = 3 * len(triangles)
 			strips_size = len(strips) + sum(len(strip) for strip in strips)
 			vertices = []
@@ -755,39 +810,7 @@ class NiTriBasedGeom:
 		verts = geomdata.vertices
 
 		for skindatablock in skindata.bone_list:
-			# find all vertices influenced by this bone
-			boneverts = [verts[skinweight.index]
-						 for skinweight in skindatablock.vertex_weights]
-
-			# find bounding box of these vertices
-			low = NifFormat.classes.Vector3()
-			low.x = min(v.x for v in boneverts)
-			low.y = min(v.y for v in boneverts)
-			low.z = min(v.z for v in boneverts)
-
-			high = NifFormat.classes.Vector3()
-			high.x = max(v.x for v in boneverts)
-			high.y = max(v.y for v in boneverts)
-			high.z = max(v.z for v in boneverts)
-
-			# center is in the center of the bounding box
-			center = (low + high) * 0.5
-
-			# radius is the largest distance from the center
-			r2 = 0.0
-			for v in boneverts:
-				d = center - v
-				r2 = max(r2, d.x*d.x+d.y*d.y+d.z*d.z)
-			radius = r2 ** 0.5
-
-			# transform center in proper coordinates (radius remains unaffected)
-			center *= skindatablock.get_transform()
-
-			# save data
-			skindatablock.bounding_sphere.center.x = center.x
-			skindatablock.bounding_sphere.center.y = center.y
-			skindatablock.bounding_sphere.center.z = center.z
-			skindatablock.bounding_sphere.radius = radius
+			skindatablock.update_center_radius(verts)
 
 	def get_interchangeable_tri_shape(self, triangles=None):
 		"""Returns a NiTriShape block that is geometrically

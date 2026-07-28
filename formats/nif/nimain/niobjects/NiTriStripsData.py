@@ -1,5 +1,5 @@
 # START_GLOBALS
-from generated.utils.vertex_cache import stripify
+from generated.utils.meshopt_stripify import stripify
 from generated.utils.tristrip import triangulate
 # END_GLOBALS
 
@@ -26,7 +26,7 @@ class NiTriStripsData:
 
 	def set_triangles(self, triangles, stitchstrips = False):
 		self.set_strips(stripify(
-			triangles, stitchstrips=stitchstrips))
+			triangles, self.num_vertices))
 
 	def get_strips(self):
 		return [[i for i in strip] for strip in self.points]

@@ -1,5 +1,5 @@
 # START_GLOBALS
-from generated.utils.vertex_cache import stripify
+from generated.utils.meshopt_stripify import stripify
 from generated.utils.tristrip import triangulate
 # END_GLOBALS
 
@@ -40,7 +40,7 @@ class NiTriShapeData:
 			dst_t.v_1, dst_t.v_2, dst_t.v_3 = src_t
 
 	def get_strips(self):
-		return stripify(self.get_triangles())
+		return stripify(self.get_triangles(), self.num_vertices)
 
 	def set_strips(self, strips):
 		self.set_triangles(triangulate(strips))

@@ -196,9 +196,9 @@ def stripify(triangles, stitchstrips = False):
 
     # stitch the strips if needed
     if stitchstrips:
-        return [stitch_strips(strips)]
-    else:
-        return strips
+        strips = [item for sublist in strips for item in sublist]
+        logging.debug("Stitched strips into a single strip: %s", strips)
+    return strips
 
 class OrientedStrip:
     """An oriented strip, with stitching support."""
