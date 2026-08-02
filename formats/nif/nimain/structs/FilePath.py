@@ -40,6 +40,3 @@ class FilePath:
 		# either it contained a sizedstring or it referred to one in the header
 		return name_type_map["SizedString"].validate_instance(instance, context, 0, None)
 
-	def get_hash(self, data=None):
-		"""Returns a case insensitive hash value."""
-		return self.get_value().lower()
