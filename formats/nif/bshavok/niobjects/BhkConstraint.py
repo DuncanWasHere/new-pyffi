@@ -11,15 +11,15 @@ class BhkConstraint:
 		entity. Root is simply a nif block that is a common parent to both
 		blocks."""
 		# check entities
-		if self.num_entities != 2:
+		if self.constraint_info.num_entities != 2:
 			raise ValueError(
 				"cannot get tranform for constraint "
 				"that hasn't exactly 2 entities")
 		# find transform of entity A relative to entity B
 
 		# find chains from parent to A and B entities
-		chainA = parent.find_chain(self.entities[0])
-		chainB = parent.find_chain(self.entities[1])
+		chainA = parent.find_chain(self.constraint_info.entity_a)
+		chainB = parent.find_chain(self.constraint_info.entity_b)
 		# validate the chains
 		assert(isinstance(chainA[-1], NifFormat.classes.BhkRigidBody))
 		assert(isinstance(chainA[-2], NifFormat.classes.NiCollisionObject))

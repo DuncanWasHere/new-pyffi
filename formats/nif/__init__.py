@@ -494,7 +494,7 @@ class NifFile(Header):
 		# special case: add bhkConstraint entities before bhkConstraint
 		# (these are actually links, not refs)
 		if isinstance(root, niobject_map["bhkConstraint"]):
-			for entity in root.entities:
+			for entity in (root.constraint_info.entity_a, root.constraint_info.entity_b):
 				if entity is not None:
 					self._makeBlockList(entity, block_index_dct, block_type_list, block_type_dct)
 
