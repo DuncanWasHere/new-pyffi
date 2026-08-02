@@ -1,0 +1,152 @@
+name: Build native libraries
+
+# Builds meshoptimizer from source for every supported platform/architecture,
+# then opens a PR updating the binaries under utils/
+#
+# Supported platforms are Windows, Linux, and macOS
+# Supported architectures are x86_64 and ARM64
+# ARM64 for Linux is currently excluded due to missing Blender support
+
+on:
+  workflow_dispatch:
+    inputs:
+      meshoptimizer_ref:
+        description: "meshoptimizer tag or commit to build"
+        required: true
+        default: "v1.2"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: build-natives
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            runner: windows-latest
+            artifact: meshoptimizer.dll
+            built: build/Release/meshoptimizer.dll
+            cmake_args: -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+
+          # Windows needs separate DLLs for each architecture
+          - name: windows-arm64
+            runner: windows-11-arm
+            artifact: meshoptimizer-arm64.dll
+            built: build/Release/meshoptimizer.dll
+            cmake_args: -A ARM64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+
+          # libstdc++ and libgcc are linked statically so the only remaining
+          # runtime dependency is glibc, of which meshoptimizer uses very little.
+          # Without this the library refuses to load on any distribution older
+          # than the runner
+          - name: linux-x64
+            runner: ubuntu-22.04
+            artifact: libmeshoptimizer.so
+            built: build/libmeshoptimizer.so
+            cmake_args: >-
+              -DCMAKE_BUILD_TYPE=Release
+              "-DCMAKE_SHARED_LINKER_FLAGS=-static-libstdc++ -static-libgcc"
+
+          # x86 and ARM will be bundled in the same dylib
+          - name: macos-universal
+            runner: macos-26
+            artifact: libmeshoptimizer.dylib
+            built: build/libmeshoptimizer.dylib
+            cmake_args: >-
+              -DCMAKE_BUILD_TYPE=Release
+              "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+    steps:
+      - name: Check out new-pyffi
+        uses: actions/checkout@v4
+
+      - name: Check out meshoptimizer
+        uses: actions/checkout@v4
+        with:
+          repository: zeux/meshoptimizer
+          ref: ${{ inputs.meshoptimizer_ref }}
+          path: meshoptimizer
+
+      # meshoptimizer ignores CMake's BUILD_SHARED_LIBS
+      - name: Configure
+        run: >
+          cmake -S meshoptimizer -B build
+          -DMESHOPT_BUILD_SHARED_LIBS=ON
+          -DMESHOPT_STABLE_EXPORTS=ON
+          -DMESHOPT_BUILD_DEMO=OFF
+          -DMESHOPT_BUILD_GLTFPACK=OFF
+          -DMESHOPT_INSTALL=OFF
+          ${{ matrix.cmake_args }}
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Stage library into utils/
+        shell: bash
+        run: cp "${{ matrix.built }}" "utils/${{ matrix.artifact }}"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade numpy
+
+      # Test the ABI
+      - name: Smoke test
+        shell: bash
+        run: python .github/scripts/test_meshopt.py
+
+      - name: Upload library
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: utils/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  propose:
+    name: Open PR with rebuilt binaries
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out new-pyffi
+        uses: actions/checkout@v4
+
+      - name: Download built libraries
+        uses: actions/download-artifact@v4
+        with:
+          path: incoming
+
+      - name: Place libraries in utils/
+        run: |
+          find incoming -type f \( -name '*.dll' -o -name '*.so' -o -name '*.dylib' \) \
+            -exec cp -v {} utils/ \;
+          # Record what these were built from
+          cat > utils/MESHOPTIMIZER_VERSION <<EOF
+          meshoptimizer ${{ inputs.meshoptimizer_ref }}
+          built by ${{ github.workflow }} run ${{ github.run_id }}
+          EOF
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/meshoptimizer-${{ inputs.meshoptimizer_ref }}
+          title: "chore: rebuild meshoptimizer binaries (${{ inputs.meshoptimizer_ref }})"
+          commit-message: "chore: rebuild meshoptimizer binaries (${{ inputs.meshoptimizer_ref }})"
+          body: |
+            Rebuilt meshoptimizer `${{ inputs.meshoptimizer_ref }}` for supported platforms.
+          add-paths: |
+            utils/*.dll
+            utils/*.so
+            utils/*.dylib
+            utils/MESHOPTIMIZER_VERSION

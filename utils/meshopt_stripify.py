@@ -1,10 +1,23 @@
 import ctypes
 import numpy as np
 import os.path
+import platform
+import sys
 
 
-# Load Mesh Optimizer DLL
-meshopt = ctypes.CDLL(os.path.join(os.path.dirname(__file__), "meshoptimizer.dll"))
+# Load Mesh Optimizer lib for the current platform/architecture
+# They are all shipped alongside each other
+if sys.platform == "win32":
+    if platform.machine().lower() in ("arm64", "aarch64"):
+        MESHOPT_LIBRARY = "meshoptimizer-arm64.dll"
+    else:
+        MESHOPT_LIBRARY = "meshoptimizer.dll"
+elif sys.platform == "darwin":
+    MESHOPT_LIBRARY = "libmeshoptimizer.dylib"
+else:
+    MESHOPT_LIBRARY = "libmeshoptimizer.so"
+
+meshopt = ctypes.CDLL(os.path.join(os.path.dirname(__file__), MESHOPT_LIBRARY))
 
 # Index buffers shared with meshoptimizer are arrays of unsigned int. Numpy's own
 # np.uint is 64 bit wide from numpy 2.0 onwards, including on Windows where it used
