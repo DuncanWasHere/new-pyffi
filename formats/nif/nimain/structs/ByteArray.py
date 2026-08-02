@@ -36,3 +36,29 @@ class ByteArray:
 		data_size = len(instance)
 		name_type_map["Uint"].validate_instance(data_size, context, 0, None)
 		assert isinstance(instance, (bytes, bytearray)), f'{instance} is not a byte or bytearray'
+
+	def __init__(self, **kwargs):
+		BasicBase.__init__(self, **kwargs)
+		self.set_value("".encode()) # b'' for > py25
+
+	def get_value(self):
+		return self._value
+
+	def set_value(self, value):
+		self._value = pyffi.object_models.common._as_bytes(value)
+
+	def get_hash(self, data=None):
+		return self._value.__hash__()
+
+	def read(self, stream, data):
+		size, = struct.unpack(data._byte_order + 'I',
+							stream.read(4))
+		self._value = stream.read(size)
+
+	def write(self, stream, data):
+		stream.write(struct.pack(data._byte_order + 'I',
+								len(self._value)))
+		stream.write(self._value)
+
+	def __str__(self):
+		return "< %i Bytes >" % len(self._value)

@@ -84,3 +84,54 @@ class BSTriShape:
 	@skin_instance.setter
 	def skin_instance(self, value):
 		self.skin = value
+
+	def _validate_skin(self):
+		"""Check that skinning blocks are valid. Will raise NifError exception
+		if not."""
+		if self.skin == None: return
+		if self.skin.data == None:
+			raise NifFormat.NifError('BSTriShape has NiSkinInstance without NiSkinData')
+		if self.skin.skeleton_root == None:
+			raise NifFormat.NifError('BSTriShape has NiSkinInstance without skeleton root')
+		if self.skin.num_bones != self.skin.data.num_bones:
+			raise NifFormat.NifError('BSTriShape and NiSkinData have different number of bones')
+
+	def add_bone(self, bone, vert_weights):
+		"""Add bone with given vertex weights.
+		After adding all bones, the geometry skinning information should be set
+		from the current position of the bones using the L{update_bind_position} function.
+
+		:param bone: The bone NiNode block.
+		:param vert_weights: A dictionary mapping each influenced vertex index to a vertex weight."""
+		self._validate_skin()
+		skininst = self.skin_instance
+		skindata = skininst.data
+		skelroot = skininst.skeleton_root
+
+		bone_index = skininst.num_bones
+		skininst.num_bones = bone_index+1
+		skininst.bones.append(bone)
+		skindata.num_bones = bone_index+1
+		skinbonedata = skindata.bone_list.dtype(self.context, skindata.bone_list.arg, skindata.bone_list.template)
+		skindata.bone_list.append(skinbonedata)
+		# set vertex weights
+		skinbonedata.num_vertices = len(vert_weights)
+		skinbonedata.reset_field("vertex_weights")
+		for i, (vert_index, vert_weight) in enumerate(iter(vert_weights.items())):
+			skinbonedata.vertex_weights[i].index = vert_index
+			skinbonedata.vertex_weights[i].weight = vert_weight
+
+	def update_skin_center_radius(self):
+		"""Update centers and radii of all skin data fields."""
+		# shortcuts relevant blocks
+		if not self.skin_instance:
+			return # no skin, nothing to do
+		self._validate_skin()
+		skininst = self.skin_instance
+		skindata = skininst.data
+		skinpartition = skininst.skin_partition
+
+		verts = [entry.vertex for entry in skinpartition.vertex_data]
+
+		for skindatablock in skindata.bone_list:
+			skindatablock.update_center_radius(verts)

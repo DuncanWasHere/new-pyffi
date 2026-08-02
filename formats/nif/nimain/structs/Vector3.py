@@ -206,3 +206,9 @@ class Vector3:
 		name_type_map["Float"].validate_instance(instance.x)
 		name_type_map["Float"].validate_instance(instance.y)
 		name_type_map["Float"].validate_instance(instance.z)
+
+	def __iter__(self):
+		# just a convenience so we can do: x,y,z = Vector3()
+		yield self.x
+		yield self.y
+		yield self.z
