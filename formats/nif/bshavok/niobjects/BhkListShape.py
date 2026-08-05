@@ -40,8 +40,8 @@ class BhkListShape:
 		else:
 			self.sub_shapes[:] = [shape, *self.sub_shapes]
 		# expand list of unknown ints as well
-		self.num_unknown_ints = num_shapes + 1
-		self.unknown_ints.append(0)
+		self.num_filters = num_shapes + 1
+		self.filters.append(0)
 
 	def remove_shape(self, shape):
 		"""Remove a shape from the shape list."""
@@ -50,6 +50,6 @@ class BhkListShape:
 		# set sub_shapes to this list
 		self.num_sub_shapes = len(shapes)
 		self.sub_shapes[:] = shapes
-		# update unknown ints
-		self.num_unknown_ints = len(shapes)
-		self.unknown_ints[:] = (0, ) * len(shapes)
+		# filter list size should match sub_shapes
+		self.num_filters = len(shapes)
+		self.filters[:] = (0, ) * len(shapes)
