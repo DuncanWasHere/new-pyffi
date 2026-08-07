@@ -31,17 +31,26 @@ class BhkListShape:
 		"""Add shape to list."""
 		# check if it's already there
 		if shape in self.sub_shapes: return
-		# increase number of shapes
-		num_shapes = self.num_sub_shapes
-		self.num_sub_shapes = num_shapes + 1
-		# add the shape
-		if not front:
+		# A newly initialized list shape contains its required single null ref.
+		# Replace that placeholder instead of adding a second entry.
+		if len(self.sub_shapes) == 1 and self.sub_shapes[0] is None:
+			self.sub_shapes[0] = shape
+		elif not front:
 			self.sub_shapes.append(shape)
 		else:
-			self.sub_shapes[:] = [shape, *self.sub_shapes]
-		# expand list of unknown ints as well
-		self.num_filters = num_shapes + 1
-		self.filters.append(0)
+			self.sub_shapes.insert(0, shape)
+			self.sub_shapes.shape = (len(self.sub_shapes),)
+		self.num_sub_shapes = len(self.sub_shapes)
+
+		n_filter = self.filters.dtype(
+			self.context, self.filters.arg, self.filters.template)
+		n_filter.layer = type(n_filter.layer).from_value(0)
+		if front and len(self.filters):
+			self.filters.insert(0, n_filter)
+			self.filters.shape = (len(self.filters),)
+		else:
+			self.filters.append(n_filter)
+		self.num_filters = len(self.filters)
 
 	def remove_shape(self, shape):
 		"""Remove a shape from the shape list."""
@@ -50,6 +59,13 @@ class BhkListShape:
 		# set sub_shapes to this list
 		self.num_sub_shapes = len(shapes)
 		self.sub_shapes[:] = shapes
+		self.sub_shapes.shape = (len(shapes),)
 		# filter list size should match sub_shapes
-		self.num_filters = len(shapes)
-		self.filters[:] = (0, ) * len(shapes)
+		self.filters[:] = []
+		self.filters.shape = (0,)
+		for _ in shapes:
+			n_filter = self.filters.dtype(
+				self.context, self.filters.arg, self.filters.template)
+			n_filter.layer = type(n_filter.layer).from_value(0)
+			self.filters.append(n_filter)
+		self.num_filters = len(self.filters)
