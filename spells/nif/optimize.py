@@ -67,7 +67,7 @@ import os.path # exists
 from pyffi.formats.nif import NifFormat
 from pyffi.utils import unique_map
 import pyffi.utils.tristrip
-import pyffi.utils.vertex_cache
+from pyffi.utils.meshopt_stripify import optimize_triangles
 import pyffi.spells
 import pyffi.spells.nif
 import pyffi.spells.nif.fix
@@ -90,6 +90,39 @@ __examples__ = """* Standard usage:
 
     python niftoaster.py optimize --exclude=NiMaterialProperty /path/to/copy/of/my/nifs
 """
+
+
+def _get_unique_triangles(triangles):
+    """Discard degenerate and duplicate triangles while preserving winding."""
+
+    seen = set()
+    for triangle in triangles:
+        v_0, v_1, v_2 = triangle
+        if v_0 == v_1 or v_1 == v_2 or v_2 == v_0:
+            continue
+        if v_0 < v_1 and v_0 < v_2:
+            triangle = (v_0, v_1, v_2)
+        elif v_1 < v_0 and v_1 < v_2:
+            triangle = (v_1, v_2, v_0)
+        else:
+            triangle = (v_2, v_0, v_1)
+        if triangle not in seen:
+            seen.add(triangle)
+            yield triangle
+
+
+def _get_vertex_map(triangles):
+    """Map referenced vertices to compact indices in first-use order."""
+
+    vertex_count = max((max(triangle) for triangle in triangles), default=-1) + 1
+    vertex_map = [None] * vertex_count
+    next_vertex = 0
+    for triangle in triangles:
+        for vertex in triangle:
+            if vertex_map[vertex] is None:
+                vertex_map[vertex] = next_vertex
+                next_vertex += 1
+    return vertex_map
 
 class SpellCleanRefLists(pyffi.spells.nif.NifSpell):
     """Remove empty and duplicate entries in reference lists."""
@@ -312,27 +345,14 @@ class SpellOptimizeGeometry(pyffi.spells.nif.NifSpell):
 
         # optimizing triangle ordering
         # first, get new triangle indices, with duplicate vertices removed
-        triangles = list(pyffi.utils.vertex_cache.get_unique_triangles(
+        triangles = list(_get_unique_triangles(
             (v_map[v0], v_map[v1], v_map[v2])
             for v0, v1, v2 in data.get_triangles()))
-        old_atvr = pyffi.utils.vertex_cache.average_transform_to_vertex_ratio(
-            triangles)
         self.toaster.msg("optimizing triangle ordering")
-        new_triangles = pyffi.utils.vertex_cache.get_cache_optimized_triangles(
-            triangles)
-        new_atvr = pyffi.utils.vertex_cache.average_transform_to_vertex_ratio(
-            new_triangles)
-        if new_atvr < old_atvr:
-            triangles = new_triangles
-            self.toaster.msg(
-                "(ATVR reduced from %.3f to %.3f)" % (old_atvr, new_atvr))
-        else:
-            self.toaster.msg(
-                "(ATVR stable at %.3f)" % old_atvr)            
+        triangles = optimize_triangles(triangles, len(v_map_inverse))
         # optimize triangles to have sequentially ordered indices
         self.toaster.msg("optimizing vertex ordering")
-        v_map_opt = pyffi.utils.vertex_cache.get_cache_optimized_vertex_map(
-            triangles)
+        v_map_opt = _get_vertex_map(triangles)
         triangles = [(v_map_opt[v0], v_map_opt[v1], v_map_opt[v2])
                       for v0, v1, v2 in triangles]
         # update vertex map and its inverse

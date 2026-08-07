@@ -47,6 +47,23 @@ import tempfile
 from pyffi.formats.nif import NifFormat
 import pyffi.spells.nif
 import pyffi.utils.tristrip # for check_tristrip
+from pyffi.utils.meshopt_stripify import optimize_triangles, stripify as meshopt_stripify
+
+
+def _average_transform_to_vertex_ratio(triangles, cache_size=32):
+    """Measure transformed vertices per unique vertex for an index buffer."""
+
+    cache = []
+    vertices = set()
+    misses = 0
+    for triangle in triangles:
+        for vertex in triangle:
+            vertices.add(vertex)
+            if vertex not in cache:
+                misses += 1
+                cache.insert(0, vertex)
+                del cache[cache_size:]
+    return misses / float(len(vertices)) if vertices else 1.0
 
 class SpellReadWrite(pyffi.spells.nif.NifSpell):
     """Like the original read-write spell, but with additional file size
@@ -774,8 +791,7 @@ class SpellCheckTriStrip(pyffi.spells.nif.NifSpell):
             # recalculate strips
             self.toaster.msg('recalculating strips')
             try:
-                strips = pyffi.utils.tristrip.stripify(
-                    triangles, stitchstrips=False)
+                strips = meshopt_stripify(triangles, branch.num_vertices)
                 report_strip_statistics(triangles, strips)
             except Exception:
                 self.toaster.logger.error('failed to strip triangles')
@@ -897,7 +913,8 @@ class SpellCheckTriangles(pyffi.spells.nif.NifSpell):
     def branchentry(self, branch):
         if isinstance(branch, NifFormat.NiTriBasedGeom):
             # get triangles
-            self.toaster.geometries.append(branch.data.get_triangles())
+            self.toaster.geometries.append(
+                (branch.data.get_triangles(), branch.data.num_vertices))
             # stop recursion
             return False
         else:
@@ -908,76 +925,17 @@ class SpellCheckTriangles(pyffi.spells.nif.NifSpell):
     def toastexit(cls, toaster):
         toaster.msg("found {0} geometries".format(len(toaster.geometries)))
 
-try:
-    import numpy
-    import scipy.optimize
-except ImportError:
-    numpy = None
-    scipy = None
-
 class SpellCheckTrianglesATVR(SpellCheckTriangles):
-    """Find optimal parameters for vertex cache algorithm by simulated
-    annealing.
-    """
+    """Report meshoptimizer's average transform-to-vertex ratio."""
 
     SPELLNAME = "check_triangles_atvr"
-    INITIAL = [1.5,    0.75, 2.0, 0.5]
-    LOWER =   [0.01, -10.0,  0.1, 0.01]
-    UPPER =   [5.0,    1.0, 10.0, 5.0]
-
-    @classmethod
-    def toastentry(cls, toaster):
-        # call base class method
-        if not SpellCheckTriangles.toastentry(toaster):
-            return False
-        # check that we have numpy and scipy
-        if (numpy is None) or (scipy is None):
-            toaster.logger.error(
-                self.SPELLNAME
-                + " requires numpy and scipy (http://www.scipy.org/)")
-            return False
-        return True
-
-    @classmethod
-    def get_atvr(cls, toaster, *args):
-        # check bounds
-        if any(value < lower or value > upper
-               for (lower, value, upper) in zip(
-                   cls.LOWER, args, cls.UPPER)):
-            return 1e30 # infinity
-        cache_decay_power, last_tri_score, valence_boost_scale, valence_boost_power = args
-        vertex_score = pyffi.utils.vertex_cache.VertexScore()
-        vertex_score.CACHE_DECAY_POWER = cache_decay_power
-        vertex_score.LAST_TRI_SCORE = last_tri_score
-        vertex_score.VALENCE_BOOST_SCALE = valence_boost_scale
-        vertex_score.VALENCE_BOOST_POWER = valence_boost_power
-        vertex_score.precalculate()
-        print("{0:.3f} {1:.3f} {2:.3f} {3:.3f}".format(
-                cache_decay_power, last_tri_score,
-                valence_boost_scale, valence_boost_power))
-        atvr = []
-        for triangles in toaster.geometries:
-            mesh = pyffi.utils.vertex_cache.Mesh(triangles, vertex_score)
-            new_triangles = mesh.get_cache_optimized_triangles()
-            atvr.append(
-                pyffi.utils.vertex_cache.average_transform_to_vertex_ratio(
-                    new_triangles, 32))
-        print(sum(atvr) / len(atvr))
-        return sum(atvr) / len(atvr)
 
     @classmethod
     def toastexit(cls, toaster):
         toaster.msg("found {0} geometries".format(len(toaster.geometries)))
-        result = scipy.optimize.anneal(
-            lambda x: cls.get_atvr(toaster, *x),
-            numpy.array(cls.INITIAL),
-            full_output=True,
-            lower=numpy.array(cls.LOWER),
-            upper=numpy.array(cls.UPPER),
-            #maxeval=10,
-            #maxaccept=10,
-            #maxiter=10,
-            #dwell=10,
-            #feps=0.1,
-            )
-        toaster.msg(str(result))
+        ratios = [
+            _average_transform_to_vertex_ratio(
+                optimize_triangles(triangles, vertex_count))
+            for triangles, vertex_count in toaster.geometries]
+        if ratios:
+            toaster.msg("average ATVR = %.6f" % (sum(ratios) / len(ratios)))

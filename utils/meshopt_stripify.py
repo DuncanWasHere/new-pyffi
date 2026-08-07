@@ -58,24 +58,33 @@ INDEX_DTYPE = np.uint32
 def stripify(triangles, vertex_count):
     """Stripify triangles, optimizing for the vertex cache."""
 
-    points = [vertex for triangle in triangles for vertex in triangle]
-    point_count = len(points)
+    points = np.asarray(
+        [vertex for triangle in triangles for vertex in triangle],
+        dtype=INDEX_DTYPE)
+    if points.size == 0:
+        return []
 
-    # Optimize the vertex cache for strips
-    cached_points = cache_vertices(points, point_count, vertex_count)
-    cached_point_count = len(cached_points)
+    cached_points = meshopt_optimize_vertex_cache_strip(
+        points, points.size, vertex_count)
+    strip_bound = meshopt_stripify_bound(cached_points.size)
+    strip = meshopt_stripify(
+        cached_points, cached_points.size, strip_bound, vertex_count)
+    return [strip.tolist()]
 
-    # Compute worst case size of output strips
-    strip_bound = meshopt_stripify_bound(cached_point_count)
 
-    # Stripify and stitch triangle points
-    strips = meshopt_stripify(cached_points, cached_point_count, strip_bound, vertex_count)
+def optimize_triangles(triangles, vertex_count):
+    """Return the triangles reordered for a strip-like vertex cache."""
 
-    # Return the nested list of strips with one element
-    return [strips.tolist()]
+    points = np.asarray(
+        [vertex for triangle in triangles for vertex in triangle],
+        dtype=INDEX_DTYPE)
+    if points.size == 0:
+        return []
+    optimized = meshopt_optimize_vertex_cache_strip(
+        points, points.size, vertex_count)
+    return [tuple(int(vertex) for vertex in optimized[i:i + 3])
+            for i in range(0, optimized.size, 3)]
 
-def cache_vertices(points, point_count, vertex_count):
-    return meshopt_optimize_vertex_cache_strip(points, point_count, vertex_count).tolist()
 
 # Vertex Cache Function Params
 meshopt.meshopt_optimizeVertexCacheStrip.restype = None # Void
@@ -87,8 +96,8 @@ meshopt.meshopt_optimizeVertexCacheStrip.argtypes = [
 ]
 
 def meshopt_optimize_vertex_cache_strip(points, point_count, vertex_count):
-    output_array = np.zeros(point_count, dtype=INDEX_DTYPE)
-    points_array = np.array(points, dtype=INDEX_DTYPE).flatten()
+    output_array = np.empty(point_count, dtype=INDEX_DTYPE)
+    points_array = np.ascontiguousarray(points, dtype=INDEX_DTYPE)
     array_size = ctypes.c_size_t(point_count)
     vertices_size = ctypes.c_size_t(vertex_count)
 
@@ -112,8 +121,8 @@ meshopt.meshopt_stripify.argtypes = [
 ]
 
 def meshopt_stripify(points, points_count, strip_bound, vertex_count):
-    output_array = np.zeros(strip_bound, dtype=INDEX_DTYPE)
-    points_array = np.array(points, dtype=INDEX_DTYPE).flatten()
+    output_array = np.empty(strip_bound, dtype=INDEX_DTYPE)
+    points_array = np.ascontiguousarray(points, dtype=INDEX_DTYPE)
     points_size = ctypes.c_size_t(points_count)
     vertices_size = ctypes.c_size_t(vertex_count)
     restart_index = ctypes.c_uint(0)

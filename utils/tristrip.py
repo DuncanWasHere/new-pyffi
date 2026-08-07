@@ -1,6 +1,4 @@
-"""A wrapper for TriangleStripifier and some utility functions, for
-stripification of sets of triangles, stitching and unstitching strips,
-and triangulation of strips."""
+"""Utilities for triangulating, checking, stitching, and unstitching strips."""
 
 # ***** BEGIN LICENSE BLOCK *****
 #
@@ -39,13 +37,6 @@ and triangulation of strips."""
 #
 # ***** END LICENSE BLOCK *****
 
-try:
-    import pytristrip
-except ImportError:
-    pytristrip = None
-    from generated.utils.trianglestripifier import TriangleStripifier
-    from generated.utils.trianglemesh import Mesh
-
 def triangulate(strips):
     """A generator for iterating over the faces in a set of
     strips. Degenerate triangles in strips are discarded.
@@ -71,11 +62,6 @@ def triangulate(strips):
             triangles.append((t0, t1, t2) if flip else (t0, t2, t1))
 
     return triangles
-
-def _generate_faces_from_triangles(triangles):
-    """Creates faces (tris) from a flat list of non-overlapping triangle indices"""
-    for i in range(0, len(triangles), 3):
-        yield triangles[i], triangles[i+1], triangles[i+2]
 
 def _sort_triangle_indices(triangles):
     """Sorts indices of each triangle so lowest index always comes first.
@@ -138,67 +124,6 @@ def _check_strips(triangles, strips):
             % (triangles, strips,
                triangles - strips_triangles,
                strips_triangles - triangles))
-
-def stripify(triangles, stitchstrips = False):
-    """Converts triangles into a list of strips.
-
-    If stitchstrips is True, then everything is wrapped in a single strip using
-    degenerate triangles.
-
-    >>> triangles = [(0,1,4),(1,2,4),(2,3,4),(3,0,4)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips)
-    >>> triangles = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11), (12, 13, 14), (15, 16, 17), (18, 19, 20), (21, 22, 23)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips)
-    >>> triangles = [(0, 1, 2), (0, 1, 2)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips)
-    >>> triangles = [(0, 1, 2), (2, 1, 0)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips)
-    >>> triangles = [(0, 1, 2), (2, 1, 0), (1, 2, 3)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips) # NvTriStrip gives wrong result
-    >>> triangles = [(0, 1, 2), (0, 1, 3)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips) # NvTriStrip gives wrong result
-    >>> triangles = [(1, 5, 2), (5, 2, 6), (5, 9, 6), (9, 6, 10), (9, 13, 10), (13, 10, 14), (0, 4, 1), (4, 1, 5), (4, 8, 5), (8, 5, 9), (8, 12, 9), (12, 9, 13), (2, 6, 3), (6, 3, 7), (6, 10, 7), (10, 7, 11), (10, 14, 11), (14, 11, 15)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips) # NvTriStrip gives wrong result
-    >>> triangles = [(1, 2, 3), (4, 5, 6), (6, 5, 7), (8, 5, 9), (4, 10, 9), (8, 3, 11), (8, 10, 3), (12, 13, 6), (14, 2, 15), (16, 13, 15), (16, 2, 3), (3, 2, 1)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips) # detects bug reported by PacificMorrowind
-    >>> triangles = [(354, 355, 356), (355, 356, 354), (354, 355, 356), (355, 356, 354), (354, 355, 356), (356, 354, 355), (354, 355, 356), (357, 359, 358),
-    ...              (380, 372, 381), (372, 370, 381), (381, 370, 354), (370, 367, 354), (367, 366, 354), (366, 355, 354), (355, 356, 354), (354, 356, 381),
-    ...              (356, 355, 357), (357, 356, 355), (356, 355, 357), (356, 355, 357), (357, 356, 355)]
-    >>> strips = stripify(triangles)
-    >>> _check_strips(triangles, strips) # NvTriStrip gives wrong result
-    """
-
-    if pytristrip:
-        strips = pytristrip.stripify(triangles)
-    else:
-        strips = []
-        # build a mesh from triangles
-        mesh = Mesh()
-        for face in triangles:
-            try:
-                mesh.add_face(*face)
-            except ValueError:
-                # degenerate face
-                pass
-        mesh.lock()
-
-        # calculate the strip
-        stripifier = TriangleStripifier(mesh)
-        strips = stripifier.find_all_strips()
-
-    # stitch the strips if needed
-    if stitchstrips:
-        strips = [item for sublist in strips for item in sublist]
-        logging.debug("Stitched strips into a single strip: %s", strips)
-    return strips
 
 class OrientedStrip:
     """An oriented strip, with stitching support."""

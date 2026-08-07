@@ -668,7 +668,7 @@ class NiTriBasedGeom:
 			logger.info("Optimizing triangle ordering in partition %i"
 						% [i for i, check_part in enumerate(parts) if id(check_part) == id(part)][0])
 			# optimize triangles for vertex cache and calculate strips
-			strips = meshopt_stripify(triangles, 0)
+			strips = meshopt_stripify(triangles, len(weights))
 			triangles_size = 3 * len(triangles)
 			strips_size = len(strips) + sum(len(strip) for strip in strips)
 			vertices = []
