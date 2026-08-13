@@ -38,8 +38,8 @@ class BhkRigidBody:
 		calc_mass, center, inertia = self.get_shape_mass_center_inertia(
 			density=density, solid=solid)
 
-		self.mass = calc_mass
-		self.center.x, self.center.y, self.center.z = center
+		self.rigid_body_info.mass = calc_mass
+		self.rigid_body_info.center.x, self.rigid_body_info.center.y, self.rigid_body_info.center.z = center
 		self.rigid_body_info.inertia_tensor.m_11 = inertia[0][0]
 		self.rigid_body_info.inertia_tensor.m_12 = inertia[0][1]
 		self.rigid_body_info.inertia_tensor.m_13 = inertia[0][2]
@@ -55,7 +55,7 @@ class BhkRigidBody:
 
 		if not mass is None:
 			mass_correction = mass / calc_mass if calc_mass != 0 else 1
-			self.mass = mass
+			self.rigid_body_info.mass = mass
 			self.rigid_body_info.inertia_tensor.m_11 *= mass_correction
 			self.rigid_body_info.inertia_tensor.m_12 *= mass_correction
 			self.rigid_body_info.inertia_tensor.m_13 *= mass_correction
