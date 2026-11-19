@@ -52,7 +52,7 @@ def stripify(indices: np.ndarray, index_count: Optional[int] = None, vertex_coun
 
     # Call C function
     result_size = lib.meshopt_stripify(
-        destination.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte)),
+        destination.ctypes.data_as(ctypes.POINTER(ctypes.c_uint)),
         optimized_indices.ctypes.data_as(ctypes.POINTER(ctypes.c_uint)),
         index_count,
         vertex_count,
@@ -103,7 +103,7 @@ def unstripify(indices: np.ndarray, index_count: Optional[int] = None) -> np.nda
 
     # Call C function
     result_size = lib.meshopt_unstripify(
-        destination.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte)),
+        destination.ctypes.data_as(ctypes.POINTER(ctypes.c_uint)),
         indices.ctypes.data_as(ctypes.POINTER(ctypes.c_uint)),
         index_count,
         restart_index
