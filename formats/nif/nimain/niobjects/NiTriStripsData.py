@@ -1,5 +1,5 @@
 # START_GLOBALS
-from .....utils.meshoptimizer import stripify, unstripify_to_triangles
+from .....utils.meshoptimizer import stripify_from_triangles, unstripify_to_triangles
 # END_GLOBALS
 
 class NiTriStripsData:
@@ -24,7 +24,7 @@ class NiTriStripsData:
 		return unstripify_to_triangles(self.points)
 
 	def set_triangles(self, triangles, stitchstrips = False):
-		self.set_strips(stripify(triangles))
+		self.set_strips(stripify_from_triangles(triangles))
 
 	def get_strips(self):
 		return [[i for i in strip] for strip in self.points]
