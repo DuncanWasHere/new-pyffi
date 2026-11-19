@@ -11,7 +11,7 @@ from generated.formats.nif.basic import Uint, FileVersion, Ulittle32, LineString
 from generated.formats.nif.bsmain.structs.BSStreamHeader import BSStreamHeader
 from generated.formats.nif.enums.DataStreamUsage import DataStreamUsage
 from generated.formats.nif.enums.EndianType import EndianType
-from generated.formats.nif.bitflagss.DataStreamAccess import DataStreamAccess
+from generated.formats.nif.bitflags.DataStreamAccess import DataStreamAccess
 from generated.formats.nif.nimain.niobjects.NiObject import NiObject
 from generated.formats.nif.nimain.structs.Header import Header
 from generated.formats.nif.nimain.structs.Footer import Footer
