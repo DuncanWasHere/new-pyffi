@@ -4,26 +4,10 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "utils"))
 
-import meshopt_stripify
-
-
-def triangles_from_strip(strip):
-    triangles = set()
-    for i in range(len(strip) - 2):
-        a, b, c = strip[i], strip[i + 1], strip[i + 2]
-        if a == b or b == c or a == c:
-            continue
-        triangles.add(frozenset((a, b, c)))
-    return triangles
+from meshoptimizer import stripify_from_triangles, unstripify_to_triangles
 
 
 def main():
-    print("python     %s" % sys.version.split()[0])
-    print("platform   %s" % sys.platform)
-    print("machine    %s" % platform.machine())
-    print("library    %s" % meshopt_stripify.MESHOPT_LIBRARY)
-    print("loaded     %s" % meshopt_stripify.meshopt._name)
-
     size = 3
     triangles = []
     for row in range(size - 1):
@@ -38,7 +22,7 @@ def main():
     vertex_count = size * size
     expected = {frozenset(t) for t in triangles}
 
-    result = meshopt_stripify.stripify(triangles, vertex_count)
+    result = stripify_from_triangles(triangles)
 
     if not result or not result[0]:
         raise SystemExit("stripify returned no strip: %r" % (result,))
@@ -52,7 +36,7 @@ def main():
             % (vertex_count - 1, strip)
         )
 
-    produced = triangles_from_strip(strip)
+    produced = triangles_from_strip(result)
     if produced != expected:
         raise SystemExit(
             "strip does not reproduce the input triangles\n"

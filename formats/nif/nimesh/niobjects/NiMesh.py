@@ -1,9 +1,8 @@
 # START_GLOBALS
 from itertools import chain
 
-
-from generated.utils.tristrip import triangulate
-import generated.formats.nif as NifFormat
+from .....utils.meshoptimizer import unstripify_to_triangles
+from .... import nif as NifFormat
 # END_GLOBALS
 
 import name_type_map
@@ -98,7 +97,7 @@ class NiMesh:
 				# Epic Mickey 2 primitive tristrips appear to be flattened normal triangles
 				triangles = tris_from_tri_indices(triangles)
 			else:
-				triangles = [triangulate(triangles)]
+				triangles = [unstripify_to_triangles(triangles)]
 		else:
 			raise NotImplementedError(f"get_triangles is not implemented for primitive type {primitive_type}")
 		triangles = list(chain.from_iterable(triangles))

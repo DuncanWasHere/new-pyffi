@@ -1,7 +1,7 @@
 import numpy as np
 from struct import Struct
 
-from generated.utils.tristrip import triangulate
+from .....utils.meshoptimizer import unstripify_to_triangles
 
 
 ushort_struct = Struct('>H')
@@ -131,7 +131,7 @@ class DisplayList:
                 if command == 0x90:
                     triangles.extend([vertex_indices[i:i + 3] for i in range(0, len(vertex_indices) - 2, 3)])
                 else:
-                    triangles.extend(triangulate([vertex_indices]))
+                    triangles.extend(unstripify_to_triangles([vertex_indices]))
             elif command in (0x20, 0x28, 0x84, 0xB0):
                 if building_part_info == False:
                     # starting a new partition

@@ -9,6 +9,7 @@ import numpy as np
 from . import optimize_vertex_cache_strip
 from ._loader import lib
 
+
 def stripify(indices: np.ndarray, index_count: Optional[int] = None, vertex_count: Optional[int] = None) -> np.ndarray:
     """
     Converts a triangle list to triangle strip, stitching strips using degenerate triangles.
@@ -63,9 +64,11 @@ def stripify(indices: np.ndarray, index_count: Optional[int] = None, vertex_coun
 
     return destination[:result_size]
 
-def stripify_from_triangles(triangles: list[list[int]], vertex_count: Optional[int] = None) -> list[list[int]]:
+
+def stripify_from_triangles(triangles: list[tuple[int]]) -> list[list[int]]:
     indices = np.asarray([index for triangle in triangles for index in triangle], dtype=np.uint32)
-    return [stripify(indices, vertex_count).tolist()]
+    return [stripify(indices).tolist()]
+
 
 def unstripify(indices: np.ndarray, index_count: Optional[int] = None) -> np.ndarray:
     """
@@ -111,6 +114,7 @@ def unstripify(indices: np.ndarray, index_count: Optional[int] = None) -> np.nda
 
     return destination[:result_size]
 
-def unstripify_to_triangles(indices: np.ndarray, index_count: Optional[int] = None) -> list[list[int]]:
-     triangle_indices = unstripify(indices, index_count)
-     return [tuple(int(index) for index in triangle_indices[i:i + 3]) for i in range(0, triangle_indices.size, 3)]
+
+def unstripify_to_triangles(indices: list[list[int]], index_count: Optional[int] = None) -> list[tuple[int, ...]]:
+    triangle_indices = unstripify(np.asarray(indices[0], dtype=np.uint32), index_count)
+    return [tuple(int(index) for index in triangle_indices[i:i + 3]) for i in range(0, triangle_indices.size, 3)]

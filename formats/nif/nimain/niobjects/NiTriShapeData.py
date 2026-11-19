@@ -1,6 +1,5 @@
 # START_GLOBALS
-from generated.utils.meshopt_stripify import stripify
-from generated.utils.tristrip import triangulate
+from .....utils.meshoptimizer import stripify_from_triangles, unstripify_to_triangles
 # END_GLOBALS
 
 class NiTriShapeData:
@@ -40,7 +39,7 @@ class NiTriShapeData:
 			dst_t.v_1, dst_t.v_2, dst_t.v_3 = src_t
 
 	def get_strips(self):
-		return stripify(self.get_triangles(), self.num_vertices)
+		return stripify_from_triangles(self.get_triangles())
 
 	def set_strips(self, strips):
-		self.set_triangles(triangulate(strips))
+		self.set_triangles(unstripify_to_triangles(strips))

@@ -67,7 +67,7 @@ import os.path # exists
 from pyffi.formats.nif import NifFormat
 from pyffi.utils import unique_map
 import pyffi.utils.tristrip
-from pyffi.utils.meshopt_stripify import optimize_triangles
+from pyffi.utils.meshopt import stripify
 import pyffi.spells
 import pyffi.spells.nif
 import pyffi.spells.nif.fix
