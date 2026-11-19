@@ -91,9 +91,9 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Stage library into utils/
+      - name: Stage library into utils/meshoptimizer
         shell: bash
-        run: cp "${{ matrix.built }}" "utils/${{ matrix.artifact }}"
+        run: cp "${{ matrix.built }}" "utils/meshoptimizer/${{ matrix.artifact }}"
 
       - uses: actions/setup-python@v5
         with:
@@ -111,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: utils/${{ matrix.artifact }}
+          path: utils/meshoptimizer/${{ matrix.artifact }}
           if-no-files-found: error
 
   propose:
@@ -127,12 +127,12 @@ jobs:
         with:
           path: incoming
 
-      - name: Place libraries in utils/
+      - name: Place libraries in utils/meshoptimizer/
         run: |
           find incoming -type f \( -name '*.dll' -o -name '*.so' -o -name '*.dylib' \) \
-            -exec cp -v {} utils/ \;
+            -exec cp -v {} utils/meshoptimizer/ \;
           # Record what these were built from
-          cat > utils/MESHOPTIMIZER_VERSION <<EOF
+          cat > utils/meshoptimizer/MESHOPTIMIZER_VERSION <<EOF
           meshoptimizer ${{ inputs.meshoptimizer_ref }}
           built by ${{ github.workflow }} run ${{ github.run_id }}
           EOF
@@ -146,7 +146,7 @@ jobs:
           body: |
             Rebuilt meshoptimizer `${{ inputs.meshoptimizer_ref }}` for supported platforms.
           add-paths: |
-            utils/*.dll
-            utils/*.so
-            utils/*.dylib
-            utils/MESHOPTIMIZER_VERSION
+            utils/meshoptimizer/*.dll
+            utils/meshoptimizer/*.so
+            utils/meshoptimizer/*.dylib
+            utils/meshoptimizer/MESHOPTIMIZER_VERSION
