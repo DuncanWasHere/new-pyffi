@@ -1,5 +1,7 @@
+# START_GLOBALS
 from generated.array import Array
 from generated.formats.nif.imports import name_type_map
+# END_GLOBALS
 
 class ByteArray:
 # START_CLASS

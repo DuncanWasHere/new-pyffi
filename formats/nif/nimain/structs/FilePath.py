@@ -1,4 +1,6 @@
+# START_GLOBALS
 from generated.formats.nif.imports import name_type_map
+# END_GLOBALS
 
 class FilePath:
 
