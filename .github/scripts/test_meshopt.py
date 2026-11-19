@@ -36,7 +36,7 @@ def main():
             % (vertex_count - 1, strip)
         )
 
-    produced = triangles_from_strip(result)
+    produced = unstripify_to_triangles(result)
     if produced != expected:
         raise SystemExit(
             "strip does not reproduce the input triangles\n"
