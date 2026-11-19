@@ -754,11 +754,13 @@ class NiTriBasedGeom:
 
 			if stripifyblock:
 				skinpartblock.reset_field("strip_lengths")
-				skinpartblock.reset_field("strips")
 
 				for i, strip in enumerate(strips):
 					skinpartblock.strip_lengths[i] = len(strip)
 
+				skinpartblock.reset_field("strips")
+
+				for i, strip in enumerate(strips):
 					for j, vertex in enumerate(strip):
 						skinpartblock.strips[i][j] = vertex_map[vertex]
 			else:
